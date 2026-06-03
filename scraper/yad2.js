@@ -28,30 +28,36 @@ function parseItem(item) {
 
   const make = strField(item.manufacturer);
   const model = strField(item.model);
-  const year = safeInt(item.year);
+  // year: direct field OR nested vehicleDates OR extracted from title
+  const yearRaw = safeInt(item.year) || safeInt(item.vehicleDates?.yearOfProduction);
+  const year = yearRaw || (() => {
+    const t = item.title && typeof item.title === 'string' ? item.title : '';
+    const m = t.match(/\b(19|20)\d{2}\b/);
+    return m ? safeInt(m[0]) : null;
+  })();
   const title = item.title && typeof item.title === 'string'
     ? item.title
     : [make, model, year].filter(Boolean).join(' ') || null;
 
-  // images: try item.images, then metaData.coverImage/images
+  // city: direct field OR nested address
+  const city = strField(item.city)
+    || item.address?.city?.text
+    || item.address?.area?.text
+    || null;
+
+  // images: direct array OR metaData object
   let images = [];
   if (Array.isArray(item.images) && item.images.length) {
     images = item.images.map(img => img?.src || img).filter(s => typeof s === 'string');
   }
   if (!images.length && item.metaData) {
-    try {
-      const meta = typeof item.metaData === 'string' ? JSON.parse(item.metaData) : item.metaData;
-      if (meta.coverImage) images = [meta.coverImage, ...(meta.images || [])];
-    } catch {}
+    const meta = typeof item.metaData === 'string' ? JSON.parse(item.metaData) : item.metaData;
+    if (meta?.coverImage) images = [meta.coverImage, ...(meta.images || [])].filter(Boolean);
   }
 
-  const descText = (() => {
-    if (!item.metaData) return null;
-    try {
-      const meta = typeof item.metaData === 'string' ? JSON.parse(item.metaData) : item.metaData;
-      return meta.description || null;
-    } catch { return null; }
-  })();
+  const meta = item.metaData
+    ? (typeof item.metaData === 'string' ? JSON.parse(item.metaData) : item.metaData)
+    : null;
 
   return {
     source: 'yad2',
@@ -63,15 +69,15 @@ function parseItem(item) {
     car_make: make,
     car_model: model,
     hand: safeInt(item.hand),
-    engine_cc: null,
+    engine_cc: safeInt(item.engineVolume),
     gear_type: item.gearBox === '1' ? 'manual' : item.gearBox === '2' ? 'auto' : null,
     seller_type: item._sourceType === 'private' ? 'private' : item.adType === 'commercial' ? 'dealer' : isDealer(item.contactName || ''),
     seller_name: item.contactName || null,
     phone: item.phone || null,
-    city: strField(item.city),
+    city,
     images,
     url: `https://www.yad2.co.il/item/${id}`,
-    description: descText,
+    description: meta?.description || null,
   };
 }
 
