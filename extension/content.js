@@ -2,6 +2,15 @@ const API = 'https://carfind-backend.onrender.com';
 const SEEN_KEY = 'carfind_seen';
 console.log('[CarFind] extension loaded on', window.location.href);
 
+function detectCategory() {
+  const path = window.location.pathname;
+  if (path.includes('/vehicles') || path.includes('/cars')) return 'vehicles';
+  if (path.includes('/property') || path.includes('/real-estate')) return 'real-estate';
+  if (path.includes('/jobs') || path.includes('/employment')) return 'jobs';
+  if (path.includes('/pets') || path.includes('/animals')) return 'pets';
+  return 'marketplace';
+}
+
 function extractPrice(text) {
   const m = text?.match(/[\d,]+/);
   return m ? parseInt(m[0].replace(/,/g, '')) : null;
@@ -51,6 +60,7 @@ function parseLink(link) {
     city: null,
     images: img ? [img] : [],
     url: `https://www.facebook.com/marketplace/item/${external_id}/`,
+    category: detectCategory(),
   };
 }
 

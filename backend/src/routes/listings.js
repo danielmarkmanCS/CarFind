@@ -19,8 +19,9 @@ router.get('/', async (req, res) => {
       conditions.push(`seller_type = 'private'`);
     }
     if (make) {
-      conditions.push(`LOWER(car_make) LIKE LOWER($${i++})`);
+      conditions.push(`(LOWER(car_make) LIKE LOWER($${i}) OR LOWER(title) LIKE LOWER($${i}))`);
       params.push(`%${make}%`);
+      i++;
     }
     if (model) {
       conditions.push(`LOWER(car_model) LIKE LOWER($${i++})`);
