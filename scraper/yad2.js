@@ -5,11 +5,11 @@ import { upsertListing, markInactive } from './dedup.js';
 chromium.use(StealthPlugin());
 
 const CATEGORIES = [
-  { id: 'vehicles',    url: 'https://www.yad2.co.il/vehicles/cars',              privateKey: true },
-  { id: 'real-estate', url: 'https://www.yad2.co.il/real-estate',                privateKey: false },
-  { id: 'products',    url: 'https://www.yad2.co.il/products',                   privateKey: false },
-  { id: 'jobs',        url: 'https://www.yad2.co.il/jobs',                       privateKey: false },
-  { id: 'pets',        url: 'https://www.yad2.co.il/pets',                       privateKey: false },
+  { id: 'vehicles',    url: 'https://www.yad2.co.il/vehicles/cars',                        privateKey: true },
+  { id: 'real-estate', url: 'https://www.yad2.co.il/real-estate/rent-apartments',          privateKey: false },
+  { id: 'products',    url: 'https://www.yad2.co.il/products/second-hand/general-items',   privateKey: false },
+  { id: 'jobs',        url: 'https://www.yad2.co.il/jobs',                                 privateKey: false },
+  { id: 'pets',        url: 'https://www.yad2.co.il/pets/dogs',                            privateKey: false },
 ];
 
 const DEALER_KEYWORDS = ['סוכנות','מוסך','ליסינג','יבואן','דילר','dealer','motors','auto','cars','garage'];
