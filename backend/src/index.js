@@ -15,14 +15,24 @@ app.use(express.json());
 app.use('/listings', listingsRouter);
 app.use('/alerts', alertsRouter);
 
-app.get('/health', (_req, res) => res.json({ ok: true }));
+const scrapeStatus = { lastRun: null, lastError: null, yad2Count: 0 };
 
-// הרצה ידנית מה-admin (לבדיקות)
+app.get('/health', (_req, res) => res.json({ ok: true, ...scrapeStatus }));
+
 app.post('/scrape/run', async (_req, res) => {
   res.json({ started: true });
-  await scrapeYad2();
-  await scrapeWinwin();
-  await sendAlerts();
+  scrapeStatus.lastRun = new Date().toISOString();
+  scrapeStatus.lastError = null;
+  try {
+    await scrapeYad2();
+    const { rows } = await (await import('./db.js')).pool.query(`SELECT COUNT(*) FROM listings WHERE source='yad2'`);
+    scrapeStatus.yad2Count = parseInt(rows[0].count);
+  } catch (err) {
+    scrapeStatus.lastError = err.message;
+    console.error('[scrape/run] error:', err.message);
+  }
+  await scrapeWinwin().catch(err => console.error('[winwin]', err.message));
+  await sendAlerts().catch(() => {});
 });
 
 // Cron כל שעה
