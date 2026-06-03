@@ -1,5 +1,6 @@
 const API = 'https://carfind-backend.onrender.com';
 const SEEN_KEY = 'carfind_seen';
+console.log('[CarFind] extension loaded on', window.location.href);
 
 function extractPrice(text) {
   const m = text?.match(/[\d,]+/);

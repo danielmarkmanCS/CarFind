@@ -9,7 +9,7 @@ import cron from 'node-cron';
 import { sendAlerts } from './services/alerts.js';
 
 const app = express();
-app.use(cors({ origin: process.env.FRONTEND_URL || '*' }));
+app.use(cors({ origin: '*' }));
 app.use(express.json());
 
 app.use('/listings', listingsRouter);
