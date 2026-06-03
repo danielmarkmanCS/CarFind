@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "CarFind — Marketplace Collector",
+  "version": "1.0",
+  "description": "אוסף מודעות רכב מ-Facebook Marketplace ושולח ל-CarFind",
+  "permissions": ["activeTab", "storage"],
+  "host_permissions": [
+    "https://www.facebook.com/*",
+    "https://carfind-backend.onrender.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://www.facebook.com/marketplace/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "CarFind",
+    "default_icon": {
+      "16": "icon.png",
+      "48": "icon.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
+}

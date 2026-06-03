@@ -123,11 +123,28 @@ export async function scrapeYad2() {
     } catch {}
   });
 
+  const MAX_PAGES = 10;
+
+  function extractNextData(raw) {
+    try {
+      const d = JSON.parse(raw || '{}');
+      const pp = d?.props?.pageProps;
+      const feedQuery = pp?.dehydratedState?.queries
+        ?.find(q => JSON.stringify(q.queryKey).includes('"feed","vehicles"'));
+      const data = feedQuery?.state?.data;
+      const totalItems = pp?.totalFeedItems || 0;
+      if (!data) return { items: [], total: totalItems };
+      const privateItems = (data.private || []).map(i => ({ ...i, _sourceType: 'private' }));
+      const soloItems = (data.solo || []).map(i => ({ ...i, _sourceType: 'private' }));
+      return { items: [...privateItems, ...soloItems], total: totalItems };
+    } catch { return { items: [], total: 0 }; }
+  }
+
   try {
+    // page 1
     await page.goto('https://www.yad2.co.il/vehicles/cars', { waitUntil: 'domcontentloaded', timeout: 60000 });
     await page.waitForTimeout(5000);
 
-    // verify we're on the real page, not bot-blocked
     const title = await page.title();
     if (!title.includes('יד2') && !title.includes('yad2')) {
       console.log(`[yad2] bot block detected (title: "${title}"), aborting`);
@@ -135,35 +152,38 @@ export async function scrapeYad2() {
     }
     console.log(`[yad2] page loaded: "${title}"`);
 
-    // extract feed from __NEXT_DATA__ (SSR embedded data)
-    const nextDataItems = await page.evaluate(() => {
-      try {
-        const d = JSON.parse(document.getElementById('__NEXT_DATA__')?.textContent || '{}');
-        const feedQuery = d?.props?.pageProps?.dehydratedState?.queries
-          ?.find(q => JSON.stringify(q.queryKey).includes('"feed","vehicles"'));
-        const data = feedQuery?.state?.data;
-        if (!data) return [];
-        const privateItems = (data.private || []).map(i => ({ ...i, _sourceType: 'private' }));
-        const soloItems = (data.solo || []).map(i => ({ ...i, _sourceType: 'private' }));
-        return [...privateItems, ...soloItems];
-      } catch { return []; }
-    });
+    const raw1 = await page.evaluate(() => document.getElementById('__NEXT_DATA__')?.textContent || '{}');
+    const { items: page1Items, total } = extractNextData(raw1);
+    allItems.push(...page1Items);
 
-    console.log(`[yad2] __NEXT_DATA__ items: ${nextDataItems.length} (private+solo)`);
-    if (nextDataItems.length) allItems.push(...nextDataItems);
+    const itemsPerPage = page1Items.length || 20;
+    const totalPages = Math.min(MAX_PAGES, Math.ceil(total / itemsPerPage));
+    console.log(`[yad2] page 1: ${page1Items.length} items | total: ${total} | pages to scrape: ${totalPages}`);
 
-    // fallback: scroll to trigger dynamic load
-    if (allItems.length === 0) {
-      for (let i = 0; i < 6; i++) {
-        await page.evaluate(() => window.scrollBy(0, 600));
-        await page.waitForTimeout(1500);
-      }
-      await page.waitForTimeout(3000);
+    // pages 2+
+    for (let p = 2; p <= totalPages; p++) {
+      await page.waitForTimeout(2000 + Math.random() * 2000);
+      await page.goto(`https://www.yad2.co.il/vehicles/cars?page=${p}`, { waitUntil: 'domcontentloaded', timeout: 60000 });
+      await page.waitForTimeout(4000);
+
+      const rawP = await page.evaluate(() => document.getElementById('__NEXT_DATA__')?.textContent || '{}');
+      const { items: pageItems } = extractNextData(rawP);
+      console.log(`[yad2] page ${p}: ${pageItems.length} items`);
+      allItems.push(...pageItems);
     }
 
-    console.log(`[yad2] total items collected: ${allItems.length}`);
+    // deduplicate by external_id
+    const seen = new Set();
+    const unique = allItems.filter(i => {
+      const id = String(i.token || i.orderId || i.id || '');
+      if (!id || seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
 
-    for (const item of allItems) {
+    console.log(`[yad2] total unique items: ${unique.length}`);
+
+    for (const item of unique) {
       const parsed = parseItem(item);
       if (!parsed) continue;
       await upsertListing(parsed);

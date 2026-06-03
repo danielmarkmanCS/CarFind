@@ -84,6 +84,30 @@ router.get('/makes', async (_req, res) => {
   }
 });
 
+// Chrome Extension endpoint
+router.post('/bulk', async (req, res) => {
+  const { listings } = req.body;
+  if (!Array.isArray(listings)) return res.status(400).json({ error: 'listings array required' });
+
+  let inserted = 0;
+  for (const l of listings) {
+    if (!l.source || !l.external_id) continue;
+    try {
+      await pool.query(
+        `INSERT INTO listings (source,external_id,title,price,year,km,car_make,car_model,seller_type,phone,city,images,url,description,seller_name)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+         ON CONFLICT (source,external_id) DO UPDATE SET
+           price=EXCLUDED.price, title=EXCLUDED.title, last_seen_at=NOW(), active=TRUE`,
+        [l.source, l.external_id, l.title, l.price, l.year, l.km,
+         l.car_make, l.car_model, l.seller_type || 'private',
+         l.phone, l.city, l.images || [], l.url, l.description, l.seller_name]
+      );
+      inserted++;
+    } catch {}
+  }
+  res.json({ inserted });
+});
+
 router.get('/stats', async (_req, res) => {
   try {
     const { rows } = await pool.query(`
