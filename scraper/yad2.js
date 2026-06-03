@@ -158,6 +158,23 @@ async function freshPage(browser) {
   return { ctx, page: await ctx.newPage() };
 }
 
+export async function scrapeYad2Category(categoryId) {
+  const cat = CATEGORIES.find(c => c.id === categoryId) || CATEGORIES[0];
+  console.log(`[yad2] launching browser for category: ${cat.id}`);
+  await new Promise(r => setTimeout(r, 2000 + Math.random() * 3000));
+
+  const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
+  const { ctx, page } = await freshPage(browser);
+  let total = 0;
+  try {
+    total = await scrapeCategory(page, cat);
+  } finally {
+    await ctx.close();
+    await browser.close();
+  }
+  return total;
+}
+
 export async function scrapeYad2() {
   console.log('[yad2] launching browser...');
   await new Promise(r => setTimeout(r, 3000 + Math.random() * 4000));

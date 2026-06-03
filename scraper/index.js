@@ -1,11 +1,16 @@
 import 'dotenv/config';
-import { scrapeYad2 } from './yad2.js';
+import { scrapeYad2Category } from './yad2.js';
 import { pool } from './db.js';
 
+// רוטציה: כל שעה קטגוריה אחרת
+const ROTATION = ['vehicles', 'real-estate', 'products', 'jobs', 'pets'];
+
 async function main() {
-  console.log('CarFind scraper starting...', new Date().toISOString());
-  const yad2Count = await scrapeYad2().catch(err => { console.error('[yad2]', err.message); return 0; });
-  console.log(`\nDone. Yad2: ${yad2Count}`);
+  const hour = new Date().getHours();
+  const cat = ROTATION[hour % ROTATION.length];
+  console.log(`CarFind scraper starting — category: ${cat}`, new Date().toISOString());
+  const count = await scrapeYad2Category(cat).catch(err => { console.error('[yad2]', err.message); return 0; });
+  console.log(`\nDone. ${cat}: ${count}`);
   await pool.end();
 }
 
