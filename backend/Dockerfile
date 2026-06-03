@@ -13,6 +13,9 @@ ENV CHROMIUM_PATH=/usr/bin/chromium
 WORKDIR /app
 COPY package*.json ./
 RUN npm install --production
+
+# bust cache on src changes
+ARG CACHEBUST=1
 COPY src ./src
 
 EXPOSE 3000
