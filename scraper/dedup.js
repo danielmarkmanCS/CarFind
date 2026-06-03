@@ -33,7 +33,9 @@ export async function upsertListing(listing) {
   await pool.query(
     `INSERT INTO listings (source,external_id,title,price,year,km,car_make,car_model,hand,engine_cc,gear_type,seller_type,seller_name,phone,city,images,url,description,category)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
-     ON CONFLICT (source,external_id) DO NOTHING`,
+     ON CONFLICT (source,external_id) DO UPDATE SET
+       title=EXCLUDED.title, price=EXCLUDED.price, images=EXCLUDED.images,
+       category=EXCLUDED.category, last_seen_at=NOW(), active=TRUE`,
     [source, external_id, title, price, year, km, car_make, car_model, hand, engine_cc, gear_type, seller_type, seller_name, phone, city, images, url, description, category]
   );
   return 'inserted';
