@@ -23,11 +23,20 @@ app.get('/debug/yad2', async (_req, res) => {
   const { chromium } = await import('playwright');
   const browser = await chromium.launch({
     executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium',
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--disable-blink-features=AutomationControlled'],
     headless: true,
   });
   try {
-    const page = await browser.newPage();
+    const context = await browser.newContext({
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      locale: 'he-IL',
+      viewport: { width: 1280, height: 800 },
+    });
+    await context.addInitScript(() => {
+      Object.defineProperty(navigator, 'webdriver', { get: () => false });
+      window.chrome = { runtime: {} };
+    });
+    const page = await context.newPage();
     await page.goto('https://www.yad2.co.il/vehicles/cars', { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForTimeout(3000);
     const title = await page.title();
@@ -36,6 +45,7 @@ app.get('/debug/yad2', async (_req, res) => {
     const cardCount = await page.evaluate(() =>
       document.querySelectorAll('[class*="feed-item"], [class*="feedItem"], [data-item-id]').length
     );
+    await context.close();
     await browser.close();
     res.json({ title, url, cardCount, bodySnippet });
   } catch (err) {
