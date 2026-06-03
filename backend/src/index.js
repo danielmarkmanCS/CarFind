@@ -19,6 +19,31 @@ const scrapeStatus = { lastRun: null, lastError: null, yad2Count: 0 };
 
 app.get('/health', (_req, res) => res.json({ ok: true, ...scrapeStatus }));
 
+app.get('/debug/yad2', async (_req, res) => {
+  const { chromium } = await import('playwright');
+  const browser = await chromium.launch({
+    executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium',
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
+    headless: true,
+  });
+  try {
+    const page = await browser.newPage();
+    await page.goto('https://www.yad2.co.il/vehicles/cars', { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.waitForTimeout(3000);
+    const title = await page.title();
+    const url = page.url();
+    const bodySnippet = await page.evaluate(() => document.body.innerText.slice(0, 500));
+    const cardCount = await page.evaluate(() =>
+      document.querySelectorAll('[class*="feed-item"], [class*="feedItem"], [data-item-id]').length
+    );
+    await browser.close();
+    res.json({ title, url, cardCount, bodySnippet });
+  } catch (err) {
+    await browser.close();
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/scrape/run', async (_req, res) => {
   res.json({ started: true });
   scrapeStatus.lastRun = new Date().toISOString();
