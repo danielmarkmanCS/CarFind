@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: carfind-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: FRONTEND_URL
+        value: https://cars.danielmms.site
+      - key: RESEND_API_KEY
+        sync: false
+      - key: PORT
+        value: "3000"
+    healthCheckPath: /health
