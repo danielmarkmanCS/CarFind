@@ -17,73 +17,76 @@ function extractKm(text) {
   return m ? parseInt(m[1].replace(/,/g, '')) * (text.includes('km') && !text.includes('00') ? 1000 : 1) : null;
 }
 
-function parseCard(card) {
-  // Facebook Marketplace listing card structure
-  const link = card.querySelector('a[href*="/marketplace/item/"]');
-  if (!link) return null;
-
+function parseLink(link) {
   const href = link.href;
   const external_id = href.match(/\/item\/(\d+)/)?.[1];
   if (!external_id) return null;
 
-  const texts = Array.from(card.querySelectorAll('span')).map(s => s.textContent.trim()).filter(Boolean);
-  const img = card.querySelector('img')?.src;
+  // walk up to find a container with meaningful content (~5 levels)
+  let container = link;
+  for (let i = 0; i < 6; i++) {
+    if (container.parentElement) container = container.parentElement;
+    const texts = Array.from(container.querySelectorAll('span')).map(s => s.textContent.trim()).filter(Boolean);
+    if (texts.length >= 2) break;
+  }
 
-  // price is usually first or second numeric span
-  const priceText = texts.find(t => t.match(/[₪$]?\s*[\d,]+/));
-  // title is usually first longer text
-  const title = texts.find(t => t.length > 5 && !t.match(/^[\d,₪$]+$/));
+  const spans = Array.from(container.querySelectorAll('span')).map(s => s.textContent.trim()).filter(Boolean);
+  const img = container.querySelector('img')?.src || link.querySelector('img')?.src;
+  const allText = spans.join(' ');
 
-  const allText = texts.join(' ');
-  const year = extractYear(allText);
-  const km = extractKm(allText);
+  const priceText = spans.find(t => t.match(/[\d,]{3,}/));
+  const title = spans.find(t => t.length > 5 && !t.match(/^[\d,₪$\s]+$/) && !t.match(/^[0-9,. ]+$/));
 
   return {
     source: 'marketplace',
     external_id,
     title: title || null,
     price: extractPrice(priceText),
-    year,
-    km,
+    year: extractYear(allText),
+    km: extractKm(allText),
     car_make: null,
     car_model: null,
     seller_type: 'private',
     phone: null,
     city: null,
     images: img ? [img] : [],
-    url: href,
+    url: `https://www.facebook.com/marketplace/item/${external_id}/`,
   };
 }
 
 async function sendToCarFind(listings) {
   try {
-    await fetch(`${API}/listings/bulk`, {
+    const res = await fetch(`${API}/listings/bulk`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ listings }),
     });
+    const data = await res.json();
+    console.log(`[CarFind] backend response:`, data);
   } catch (e) {
-    console.log('[CarFind]', e.message);
+    console.log('[CarFind] fetch error:', e.message);
   }
 }
 
 async function scan() {
   const seen = JSON.parse(localStorage.getItem(SEEN_KEY) || '[]');
-  const cards = document.querySelectorAll('[data-testid="marketplace_feed_item"], [aria-label*="רכב"], [aria-label*="car"], [href*="/marketplace/item/"]');
+  const links = document.querySelectorAll('a[href*="/marketplace/item/"]');
+  console.log(`[CarFind] found ${links.length} marketplace links`);
 
   const newListings = [];
-  cards.forEach(card => {
-    const parsed = parseCard(card.closest('[role="article"]') || card);
+  links.forEach(link => {
+    const parsed = parseLink(link);
     if (!parsed || seen.includes(parsed.external_id)) return;
     seen.push(parsed.external_id);
     newListings.push(parsed);
   });
 
+  console.log(`[CarFind] new listings to send: ${newListings.length}`);
+
   if (newListings.length) {
     await sendToCarFind(newListings);
     localStorage.setItem(SEEN_KEY, JSON.stringify(seen.slice(-500)));
     chrome.runtime.sendMessage({ type: 'NEW_LISTINGS', count: newListings.length });
-    console.log(`[CarFind] sent ${newListings.length} listings`);
   }
 }
 
