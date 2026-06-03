@@ -148,27 +148,35 @@ async function scrapeCategory(page, cat) {
   return activeIds.length;
 }
 
-export async function scrapeYad2() {
-  console.log('[yad2] launching browser...');
-  await new Promise(r => setTimeout(r, 3000 + Math.random() * 4000));
-
-  const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
-  const context = await browser.newContext({
+async function freshPage(browser) {
+  const ctx = await browser.newContext({
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
     locale: 'he-IL',
     viewport: { width: 1280, height: 900 },
     extraHTTPHeaders: { 'Accept-Language': 'he-IL,he;q=0.9' },
   });
-  const page = await context.newPage();
+  return { ctx, page: await ctx.newPage() };
+}
 
+export async function scrapeYad2() {
+  console.log('[yad2] launching browser...');
+  await new Promise(r => setTimeout(r, 3000 + Math.random() * 4000));
+
+  const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
   let total = 0;
+
   try {
     for (const cat of CATEGORIES) {
-      total += await scrapeCategory(page, cat);
-      await page.waitForTimeout(3000 + Math.random() * 3000);
+      const { ctx, page } = await freshPage(browser);
+      try {
+        total += await scrapeCategory(page, cat);
+      } finally {
+        await ctx.close();
+      }
+      // הפסקה בין קטגוריות + session חדש
+      await new Promise(r => setTimeout(r, 8000 + Math.random() * 7000));
     }
   } finally {
-    await context.close();
     await browser.close();
   }
 
