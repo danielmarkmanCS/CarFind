@@ -20,7 +20,7 @@ interface Props {
 export default function FiltersPanel({ makes, onSearch, loading }: Props) {
   const [f, setF] = useState<Filters>({ private_only: true });
   const set = (k: keyof Filters, v: unknown) => setF(p => ({ ...p, [k]: v || undefined }));
-  const isVehicles = !f.category || f.category === 'vehicles';
+  const isVehicles = f.category === 'vehicles';
 
   return (
     <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
