@@ -1,37 +1,14 @@
-import axios from 'axios';
+import { chromium } from 'playwright';
 import { classify } from '../services/dealerDetection.js';
 import { upsertListing, markInactive } from '../services/dedup.js';
 
-const BASE = 'https://gw.yad2.co.il/feed-search-legacy/vehicles/cars';
-
-const HEADERS = {
-  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36',
-  'Referer': 'https://www.yad2.co.il/',
-  'Accept': 'application/json',
-  'Accept-Language': 'he-IL,he;q=0.9',
-};
-
-function buildParams(filters = {}) {
-  return {
-    carFamilyType: '1,2,3,4,5,6,7,8',
-    topArea: filters.topArea || 0,
-    year: filters.yearMin && filters.yearMax
-      ? `${filters.yearMin}-${filters.yearMax}`
-      : '-1--1',
-    km: filters.kmMax ? `0-${filters.kmMax}` : '-1--1',
-    price: filters.priceMax ? `0-${filters.priceMax}` : '-1--1',
-    manufacturer: filters.make || '',
-    model: filters.model || '',
-    rows: 40,
-    page: 1,
-  };
-}
+const YAD2_URL = 'https://www.yad2.co.il/vehicles/cars';
 
 function parseItem(item) {
   return {
     source: 'yad2',
-    external_id: String(item.id || item.orderId),
-    title: item.title || `${item.manufacturer} ${item.model} ${item.year}`,
+    external_id: String(item.id || item.orderId || item.token),
+    title: item.title || `${item.manufacturer || ''} ${item.model || ''} ${item.year || ''}`.trim(),
     price: item.price ? parseInt(String(item.price).replace(/\D/g, '')) : null,
     year: item.year ? parseInt(item.year) : null,
     km: item.kilometers ? parseInt(String(item.kilometers).replace(/\D/g, '')) : null,
@@ -43,48 +20,68 @@ function parseItem(item) {
     seller_name: item.contactName || null,
     phone: item.phone || null,
     city: item.city || null,
-    images: item.images?.map(img => img.src || img) || [],
-    url: `https://www.yad2.co.il/item/${item.id || item.orderId}`,
-    description: item.metaData || null,
+    images: (item.images || []).map(img => img.src || img).filter(Boolean),
+    url: `https://www.yad2.co.il/item/${item.id || item.orderId || item.token}`,
+    description: item.metaData || item.info_text || null,
   };
 }
 
-export async function scrapeYad2(filters = {}) {
-  console.log('[yad2] starting scrape...');
-  const params = buildParams(filters);
-  let page = 1;
+export async function scrapeYad2() {
+  console.log('[yad2] starting scrape with Playwright...');
   const activeIds = [];
-  let totalPages = 1;
 
-  do {
-    try {
-      const { data } = await axios.get(BASE, {
-        params: { ...params, page },
-        headers: HEADERS,
-        timeout: 15000,
-      });
+  const browser = await chromium.launch({
+    executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium',
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+    headless: true,
+  });
 
-      const items = data?.data?.feed?.feed_items || [];
-      totalPages = data?.data?.pagination?.last_page || 1;
+  try {
+    const context = await browser.newContext({
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36',
+      locale: 'he-IL',
+    });
 
-      for (const item of items) {
-        if (!item.id && !item.orderId) continue;
-        const parsed = parseItem(item);
-        parsed.seller_type = await classify(parsed.phone, parsed.seller_name);
-        await upsertListing(parsed);
-        activeIds.push(parsed.external_id);
+    const page = await context.newPage();
+    const collectedItems = [];
+
+    // intercept Yad2 API responses
+    page.on('response', async (response) => {
+      const url = response.url();
+      if (url.includes('feed-search') || url.includes('/vehicles/cars') && url.includes('page=')) {
+        try {
+          const json = await response.json();
+          const items = json?.data?.feed?.feed_items || json?.feed_items || [];
+          collectedItems.push(...items.filter(i => i.id || i.orderId || i.token));
+        } catch {}
       }
+    });
 
-      console.log(`[yad2] page ${page}/${totalPages} — ${items.length} items`);
-      page++;
+    await page.goto(YAD2_URL, { waitUntil: 'networkidle', timeout: 60000 });
+    await page.waitForTimeout(3000);
 
-      await new Promise(r => setTimeout(r, 1200));
-    } catch (err) {
-      console.error(`[yad2] page ${page} error:`, err.message);
-      break;
+    // scroll to trigger more loads
+    for (let i = 0; i < 3; i++) {
+      await page.evaluate(() => window.scrollBy(0, window.innerHeight * 2));
+      await page.waitForTimeout(2000);
     }
-  } while (page <= Math.min(totalPages, 25));
+
+    console.log(`[yad2] collected ${collectedItems.length} items from page intercept`);
+
+    for (const item of collectedItems) {
+      const parsed = parseItem(item);
+      parsed.seller_type = await classify(parsed.phone, parsed.seller_name);
+      await upsertListing(parsed);
+      activeIds.push(parsed.external_id);
+    }
+
+    await context.close();
+  } catch (err) {
+    console.error('[yad2] error:', err.message);
+  } finally {
+    await browser.close();
+  }
 
   await markInactive('yad2', activeIds);
-  console.log(`[yad2] done. ${activeIds.length} listings processed.`);
+  console.log(`[yad2] done. ${activeIds.length} listings saved.`);
 }
