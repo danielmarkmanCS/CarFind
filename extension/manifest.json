@@ -17,11 +17,7 @@
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "CarFind",
-    "default_icon": {
-      "16": "icon.png",
-      "48": "icon.png"
-    }
+    "default_title": "CarFind"
   },
   "background": {
     "service_worker": "background.js"
