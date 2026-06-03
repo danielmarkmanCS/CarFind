@@ -4,35 +4,14 @@ import { upsertListing, markInactive } from '../services/dedup.js';
 
 const YAD2_URL = 'https://www.yad2.co.il/vehicles/cars';
 
-function parseItem(item) {
-  return {
-    source: 'yad2',
-    external_id: String(item.id || item.orderId || item.token),
-    title: item.title || `${item.manufacturer || ''} ${item.model || ''} ${item.year || ''}`.trim(),
-    price: item.price ? parseInt(String(item.price).replace(/\D/g, '')) : null,
-    year: item.year ? parseInt(item.year) : null,
-    km: item.kilometers ? parseInt(String(item.kilometers).replace(/\D/g, '')) : null,
-    car_make: item.manufacturer || null,
-    car_model: item.model || null,
-    hand: item.hand ? parseInt(item.hand) : null,
-    engine_cc: item.engineSize ? parseInt(item.engineSize) : null,
-    gear_type: item.gearBox === '1' ? 'manual' : item.gearBox === '2' ? 'auto' : null,
-    seller_name: item.contactName || null,
-    phone: item.phone || null,
-    city: item.city || null,
-    images: (item.images || []).map(img => img.src || img).filter(Boolean),
-    url: `https://www.yad2.co.il/item/${item.id || item.orderId || item.token}`,
-    description: item.metaData || item.info_text || null,
-  };
-}
-
 export async function scrapeYad2() {
-  console.log('[yad2] starting scrape with Playwright...');
+  console.log('[yad2] starting scrape...');
   const activeIds = [];
+  const apiItems = [];
 
   const browser = await chromium.launch({
     executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium',
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
     headless: true,
   });
 
@@ -43,36 +22,111 @@ export async function scrapeYad2() {
     });
 
     const page = await context.newPage();
-    const collectedItems = [];
 
-    // intercept Yad2 API responses
+    // capture ALL json responses to find the right API URL
     page.on('response', async (response) => {
       const url = response.url();
-      if (url.includes('feed-search') || url.includes('/vehicles/cars') && url.includes('page=')) {
-        try {
-          const json = await response.json();
-          const items = json?.data?.feed?.feed_items || json?.feed_items || [];
-          collectedItems.push(...items.filter(i => i.id || i.orderId || i.token));
-        } catch {}
-      }
+      const ct = response.headers()['content-type'] || '';
+      if (!ct.includes('json')) return;
+      try {
+        const json = await response.json();
+        const items =
+          json?.data?.feed?.feed_items ||
+          json?.feed?.feed_items ||
+          json?.feed_items ||
+          json?.data?.items ||
+          json?.items ||
+          [];
+        if (items.length > 0) {
+          console.log(`[yad2] intercepted ${items.length} items from: ${url}`);
+          apiItems.push(...items);
+        }
+      } catch {}
     });
 
-    await page.goto(YAD2_URL, { waitUntil: 'networkidle', timeout: 60000 });
-    await page.waitForTimeout(3000);
+    console.log('[yad2] loading page...');
+    await page.goto(YAD2_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await page.waitForTimeout(5000);
 
-    // scroll to trigger more loads
-    for (let i = 0; i < 3; i++) {
-      await page.evaluate(() => window.scrollBy(0, window.innerHeight * 2));
-      await page.waitForTimeout(2000);
-    }
+    console.log(`[yad2] API captured ${apiItems.length} items. Trying DOM fallback...`);
 
-    console.log(`[yad2] collected ${collectedItems.length} items from page intercept`);
+    // DOM fallback — extract from rendered page
+    if (apiItems.length === 0) {
+      const domItems = await page.evaluate(() => {
+        const cards = document.querySelectorAll('[class*="feed-item"], [class*="feedItem"], [data-item-id]');
+        return Array.from(cards).map(card => ({
+          id: card.getAttribute('data-item-id') || card.getAttribute('id'),
+          title: card.querySelector('[class*="title"]')?.textContent?.trim(),
+          price: card.querySelector('[class*="price"]')?.textContent?.trim(),
+          year: card.querySelector('[class*="year"]')?.textContent?.trim(),
+          km: card.querySelector('[class*="km"], [class*="kilometers"]')?.textContent?.trim(),
+          city: card.querySelector('[class*="city"]')?.textContent?.trim(),
+          image: card.querySelector('img')?.src,
+          href: card.querySelector('a')?.href,
+        }));
+      });
 
-    for (const item of collectedItems) {
-      const parsed = parseItem(item);
-      parsed.seller_type = await classify(parsed.phone, parsed.seller_name);
-      await upsertListing(parsed);
-      activeIds.push(parsed.external_id);
+      console.log(`[yad2] DOM extracted ${domItems.length} items`);
+
+      for (const item of domItems) {
+        if (!item.id && !item.href) continue;
+        const priceNum = item.price ? parseInt(item.price.replace(/\D/g, '')) : null;
+        const kmNum = item.km ? parseInt(item.km.replace(/\D/g, '')) : null;
+        const yearNum = item.year ? parseInt(item.year.match(/\d{4}/)?.[0]) : null;
+        const extId = item.id || item.href?.split('/').pop();
+        if (!extId) continue;
+
+        const parsed = {
+          source: 'yad2',
+          external_id: String(extId),
+          title: item.title || null,
+          price: priceNum,
+          year: yearNum,
+          km: kmNum,
+          car_make: null,
+          car_model: null,
+          hand: null,
+          engine_cc: null,
+          gear_type: null,
+          seller_type: 'unknown',
+          seller_name: null,
+          phone: null,
+          city: item.city || null,
+          images: item.image ? [item.image] : [],
+          url: item.href || `https://www.yad2.co.il/item/${extId}`,
+          description: null,
+        };
+
+        await upsertListing(parsed);
+        activeIds.push(parsed.external_id);
+      }
+    } else {
+      // use API items
+      for (const item of apiItems) {
+        const parsed = {
+          source: 'yad2',
+          external_id: String(item.id || item.orderId || item.token),
+          title: item.title || `${item.manufacturer || ''} ${item.model || ''} ${item.year || ''}`.trim(),
+          price: item.price ? parseInt(String(item.price).replace(/\D/g, '')) : null,
+          year: item.year ? parseInt(item.year) : null,
+          km: item.kilometers ? parseInt(String(item.kilometers).replace(/\D/g, '')) : null,
+          car_make: item.manufacturer || null,
+          car_model: item.model || null,
+          hand: item.hand ? parseInt(item.hand) : null,
+          engine_cc: null,
+          gear_type: item.gearBox === '1' ? 'manual' : item.gearBox === '2' ? 'auto' : null,
+          seller_type: 'unknown',
+          seller_name: item.contactName || null,
+          phone: item.phone || null,
+          city: item.city || null,
+          images: (item.images || []).map(img => img.src || img).filter(Boolean),
+          url: `https://www.yad2.co.il/item/${item.id || item.orderId}`,
+          description: item.metaData || null,
+        };
+        parsed.seller_type = await classify(parsed.phone, parsed.seller_name);
+        await upsertListing(parsed);
+        activeIds.push(parsed.external_id);
+      }
     }
 
     await context.close();
