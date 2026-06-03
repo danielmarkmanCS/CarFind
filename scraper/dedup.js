@@ -20,8 +20,12 @@ export async function upsertListing(listing) {
       history = [{ price: row.price, date: new Date() }, ...history].slice(0, 10);
     }
     await pool.query(
-      `UPDATE listings SET title=$1,price=$2,km=$3,seller_type=$4,images=$5,last_seen_at=NOW(),price_history=$6,active=TRUE WHERE id=$7`,
-      [title, price, km, seller_type, images, JSON.stringify(history), row.id]
+      `UPDATE listings SET title=$1,price=$2,km=$3,seller_type=$4,images=$5,
+       year=$6,car_make=$7,car_model=$8,city=$9,hand=$10,
+       last_seen_at=NOW(),price_history=$11,active=TRUE WHERE id=$12`,
+      [title, price, km, seller_type, images,
+       year, car_make, car_model, city, hand,
+       JSON.stringify(history), row.id]
     );
     return 'updated';
   }
