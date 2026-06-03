@@ -17,6 +17,7 @@ export interface Listing {
   city: string | null;
   images: string[];
   url: string;
+  category: string;
   first_seen_at: string;
   price_history: { price: number; date: string }[];
 }
@@ -29,6 +30,8 @@ export interface ListingsResponse {
 }
 
 export interface Filters {
+  q?: string;
+  category?: string;
   make?: string;
   model?: string;
   year_min?: number;
@@ -40,13 +43,23 @@ export interface Filters {
   page?: number;
 }
 
+export const CATEGORIES = [
+  { id: '', label: 'הכל' },
+  { id: 'vehicles', label: '🚗 רכבים' },
+  { id: 'real-estate', label: '🏠 נדל"ן' },
+  { id: 'products', label: '📦 מוצרים' },
+  { id: 'jobs', label: '💼 דרושים' },
+  { id: 'pets', label: '🐾 חיות מחמד' },
+  { id: 'marketplace', label: '📱 Marketplace' },
+];
+
 export async function fetchListings(filters: Filters): Promise<ListingsResponse> {
   const params = new URLSearchParams();
   Object.entries(filters).forEach(([k, v]) => {
     if (v !== undefined && v !== '' && v !== false) params.set(k, String(v));
   });
   const res = await fetch(`${BASE}/listings?${params}`);
-  if (!res.ok) throw new Error('שגיאה בטעינת רכבים');
+  if (!res.ok) throw new Error('שגיאה בטעינת מודעות');
   return res.json();
 }
 

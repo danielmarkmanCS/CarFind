@@ -45,10 +45,10 @@ export default function App() {
       {/* Header */}
       <div style={{ marginBottom: 28 }}>
         <div style={{ fontSize: 28, fontWeight: 900, letterSpacing: '-0.5px' }}>
-          🚗 CarFind
+          🔍 FindIt
         </div>
         <div style={{ color: 'var(--muted)', fontSize: 14, marginTop: 4 }}>
-          רכבים פרטיים בלבד — יד2, Winwin, Forsale ועוד
+          חיפוש מודעות מיד2, Marketplace ועוד — הכל במקום אחד
         </div>
       </div>
 
@@ -60,7 +60,7 @@ export default function App() {
         <div>
           {!loading && (
             <div style={{ marginBottom: 16, fontSize: 13, color: 'var(--muted)' }}>
-              {total > 0 ? `${total.toLocaleString('he-IL')} רכבים נמצאו` : ''}
+              {total > 0 ? `${total.toLocaleString('he-IL')} מודעות נמצאו` : ''}
             </div>
           )}
 
@@ -75,7 +75,7 @@ export default function App() {
           ) : listings.length === 0 && !error ? (
             <div style={{ textAlign: 'center', padding: 60, color: 'var(--muted)' }}>
               <div style={{ fontSize: 40 }}>🔍</div>
-              <div style={{ marginTop: 12 }}>לא נמצאו רכבים. נסה להרחיב את החיפוש.</div>
+              <div style={{ marginTop: 12 }}>לא נמצאו מודעות. נסה מילות חיפוש אחרות.</div>
             </div>
           ) : (
             <div style={{

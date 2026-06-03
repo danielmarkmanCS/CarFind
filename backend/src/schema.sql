@@ -53,3 +53,5 @@ CREATE INDEX IF NOT EXISTS idx_listings_km         ON listings(km);
 CREATE INDEX IF NOT EXISTS idx_listings_seller     ON listings(seller_type);
 CREATE INDEX IF NOT EXISTS idx_listings_active     ON listings(active);
 CREATE INDEX IF NOT EXISTS idx_listings_last_seen  ON listings(last_seen_at);
+ALTER TABLE listings ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'general';
+CREATE INDEX IF NOT EXISTS idx_listings_category ON listings(category);

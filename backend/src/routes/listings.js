@@ -7,7 +7,8 @@ router.get('/', async (req, res) => {
   try {
     const {
       make, model, year_min, year_max, km_max, price_max,
-      private_only, source, page = 1, limit = 24
+      private_only, source, category, q,
+      page = 1, limit = 24
     } = req.query;
 
     const conditions = ['active = TRUE'];
@@ -44,6 +45,15 @@ router.get('/', async (req, res) => {
     if (source) {
       conditions.push(`source = $${i++}`);
       params.push(source);
+    }
+    if (category) {
+      conditions.push(`category = $${i++}`);
+      params.push(category);
+    }
+    if (q) {
+      conditions.push(`(LOWER(title) LIKE LOWER($${i++}) OR LOWER(description) LIKE LOWER($${i++}))`);
+      params.push(`%${q}%`, `%${q}%`);
+      i++;
     }
 
     const offset = (parseInt(page) - 1) * parseInt(limit);
@@ -94,13 +104,14 @@ router.post('/bulk', async (req, res) => {
     if (!l.source || !l.external_id) continue;
     try {
       await pool.query(
-        `INSERT INTO listings (source,external_id,title,price,year,km,car_make,car_model,seller_type,phone,city,images,url,description,seller_name)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+        `INSERT INTO listings (source,external_id,title,price,year,km,car_make,car_model,seller_type,phone,city,images,url,description,seller_name,category)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
          ON CONFLICT (source,external_id) DO UPDATE SET
-           price=EXCLUDED.price, title=EXCLUDED.title, last_seen_at=NOW(), active=TRUE`,
+           price=EXCLUDED.price, title=EXCLUDED.title, last_seen_at=NOW(), active=TRUE, category=EXCLUDED.category`,
         [l.source, l.external_id, l.title, l.price, l.year, l.km,
          l.car_make, l.car_model, l.seller_type || 'private',
-         l.phone, l.city, l.images || [], l.url, l.description, l.seller_name]
+         l.phone, l.city, l.images || [], l.url, l.description, l.seller_name,
+         l.category || 'general']
       );
       inserted++;
     } catch {}
