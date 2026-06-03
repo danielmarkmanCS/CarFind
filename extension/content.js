@@ -2,7 +2,7 @@ const API = 'https://carfind-backend.onrender.com';
 const SEEN_KEY = 'carfind_seen';
 console.log('[CarFind] extension loaded on', window.location.href);
 
-const CATEGORY_MAP: Record<string, string> = {
+const CATEGORY_MAP = {
   '/vehicles': 'vehicles',
   '/cars': 'vehicles',
   '/property-rentals': 'real-estate',
@@ -15,7 +15,7 @@ const CATEGORY_MAP: Record<string, string> = {
   '/animals': 'pets',
 };
 
-function detectCategory(): string | null {
+function detectCategory() {
   const path = window.location.pathname;
   for (const [key, cat] of Object.entries(CATEGORY_MAP)) {
     if (path.includes(key)) return cat;
