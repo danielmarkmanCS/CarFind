@@ -85,7 +85,7 @@ async function scrapeCategory(context, cat) {
         const yearMatch = allText.match(/\b(19|20)\d{2}\b/);
         const kmMatch = allText.match(/([\d,]+)\s*k?m/i);
         const rawPrice = priceText ? parseInt(priceText.replace(/\D/g, '')) : null;
-        const price = rawPrice && rawPrice < 10000000 ? rawPrice : null;
+        const price = rawPrice && rawPrice >= 10 && rawPrice < 5000000 ? rawPrice : null;
         results.push({
           source: 'marketplace', external_id,
           title: title || null,
