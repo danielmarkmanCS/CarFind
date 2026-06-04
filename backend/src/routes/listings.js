@@ -4,6 +4,15 @@ import { pool } from '../db.js';
 const router = Router();
 
 const HE_EN = {
+  // יצרני רכב
+  'טויוטה': 'toyota', 'יונדאי': 'hyundai', 'מאזדה': 'mazda',
+  'פולקסווגן': 'volkswagen vw', 'סקודה': 'skoda', 'סיאט': 'seat',
+  'קיה': 'kia', 'רנו': 'renault', 'פיג׳ו': 'peugeot', 'פיאט': 'fiat',
+  'מיצובישי': 'mitsubishi', 'סובארו': 'subaru', 'אאודי': 'audi',
+  'מרצדס': 'mercedes', 'ב מ וו': 'bmw', 'ניסאן': 'nissan',
+  'הונדה': 'honda', 'שברולט': 'chevrolet', 'פורד': 'ford',
+  'אינפיניטי': 'infiniti', 'לקסוס': 'lexus', 'אקורה': 'acura',
+  // כללי
   'רכב': 'car', 'מכונית': 'car', 'אוטו': 'car', 'ג׳יפ': 'jeep',
   'טלוויזיה': 'tv television', 'מחשב': 'computer laptop', 'טלפון': 'phone',
   'אייפון': 'iphone', 'סמסונג': 'samsung', 'אייפד': 'ipad',
@@ -40,9 +49,16 @@ router.get('/', async (req, res) => {
       conditions.push(`seller_type = 'private'`);
     }
     if (make) {
-      conditions.push(`(LOWER(car_make) LIKE LOWER($${i}) OR LOWER(title) LIKE LOWER($${i}))`);
-      params.push(`%${make}%`);
-      i++;
+      const makeEn = expandQuery(make);
+      if (makeEn !== make) {
+        conditions.push(`(LOWER(car_make) LIKE LOWER($${i}) OR LOWER(title) LIKE LOWER($${i}) OR LOWER(car_make) LIKE LOWER($${i+1}) OR LOWER(title) LIKE LOWER($${i+1}))`);
+        params.push(`%${make}%`, `%${makeEn}%`);
+        i += 2;
+      } else {
+        conditions.push(`(LOWER(car_make) LIKE LOWER($${i}) OR LOWER(title) LIKE LOWER($${i}))`);
+        params.push(`%${make}%`);
+        i++;
+      }
     }
     if (model) {
       conditions.push(`LOWER(car_model) LIKE LOWER($${i++})`);
