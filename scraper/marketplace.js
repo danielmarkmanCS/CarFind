@@ -80,14 +80,16 @@ async function scrapeCategory(context, cat) {
         const allText = spans.join(' ');
         const external_id = (link.href || '').match(/\/item\/(\d+)/)?.[1];
         if (!external_id) return;
-        const priceText = spans.find(t => t.match(/[\d,]{3,}/));
+        const priceText = spans.find(t => t.match(/[\d,]{3,}/) && !t.match(/^05\d/));
         const title = spans.find(t => t.length > 5 && !t.match(/^[\d,₪$\s]+$/));
         const yearMatch = allText.match(/\b(19|20)\d{2}\b/);
         const kmMatch = allText.match(/([\d,]+)\s*k?m/i);
+        const rawPrice = priceText ? parseInt(priceText.replace(/\D/g, '')) : null;
+        const price = rawPrice && rawPrice < 10000000 ? rawPrice : null;
         results.push({
           source: 'marketplace', external_id,
           title: title || null,
-          price: priceText ? parseInt(priceText.replace(/\D/g, '')) : null,
+          price,
           year: yearMatch ? parseInt(yearMatch[0]) : null,
           km: kmMatch ? parseInt(kmMatch[1].replace(',', '')) : null,
           car_make: null, car_model: null, seller_type: 'private',
