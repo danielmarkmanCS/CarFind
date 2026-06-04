@@ -52,8 +52,8 @@ router.get('/', async (req, res) => {
       params.push(category);
     }
     if (q) {
-      conditions.push(`(LOWER(title) LIKE LOWER($${i++}) OR LOWER(description) LIKE LOWER($${i++}))`);
-      params.push(`%${q}%`, `%${q}%`);
+      conditions.push(`(LOWER(title) LIKE LOWER($${i}) OR LOWER(description) LIKE LOWER($${i}))`);
+      params.push(`%${q}%`);
       i++;
     }
 

@@ -15,7 +15,7 @@ COPY package*.json ./
 RUN npm install --production
 
 # bust cache on src changes
-ARG CACHEBUST=4
+ARG CACHEBUST=5
 COPY src ./src
 
 EXPOSE 3000
