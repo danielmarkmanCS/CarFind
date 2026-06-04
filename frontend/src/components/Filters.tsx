@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import type { Filters } from '../api/listings';
-import { CATEGORIES } from '../api/listings';
 
 const inputStyle: React.CSSProperties = {
   background: '#111', border: '1px solid var(--border)', borderRadius: 6,
@@ -11,6 +10,14 @@ const labelStyle: React.CSSProperties = {
   textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 4,
 };
 
+const YAD2_CATEGORIES = [
+  { id: 'vehicles',    label: '🚗 רכבים' },
+  { id: 'real-estate', label: '🏠 נדל"ן' },
+  { id: 'products',    label: '📦 מוצרים' },
+  { id: 'jobs',        label: '💼 דרושים' },
+  { id: 'pets',        label: '🐾 חיות מחמד' },
+];
+
 interface Props {
   makes: string[];
   onSearch: (f: Filters) => void;
@@ -19,39 +26,61 @@ interface Props {
 
 export default function FiltersPanel({ makes, onSearch, loading }: Props) {
   const [f, setF] = useState<Filters>({ private_only: true });
+  const [tab, setTab] = useState<'yad2' | 'marketplace'>('yad2');
   const set = (k: keyof Filters, v: unknown) => setF(p => ({ ...p, [k]: v || undefined }));
-  const isVehicles = f.category === 'vehicles';
+
+  function switchTab(t: 'yad2' | 'marketplace') {
+    setTab(t);
+    setF({ private_only: true, source: t === 'marketplace' ? 'marketplace' : undefined });
+  }
+
+  const isVehicles = tab === 'yad2' && f.category === 'vehicles';
 
   return (
     <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div style={{ fontWeight: 900, fontSize: 18 }}>חיפוש</div>
 
-      {/* Free text search */}
+      {/* Source tabs */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+        {(['yad2', 'marketplace'] as const).map(t => (
+          <button key={t} onClick={() => switchTab(t)} style={{
+            padding: '8px', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer',
+            background: tab === t ? 'var(--accent)' : '#1a1a1a',
+            color: 'var(--text)', border: '1px solid var(--border)',
+          }}>
+            {t === 'yad2' ? '🔵 יד2' : '📱 Marketplace'}
+          </button>
+        ))}
+      </div>
+
+      {/* Free text */}
       <div>
         <label style={labelStyle}>חיפוש חופשי</label>
-        <input style={inputStyle} placeholder='למשל: ספה, אייפון, דירה...'
+        <input style={inputStyle} placeholder="מה אתה מחפש?"
           value={f.q ?? ''} onChange={e => set('q', e.target.value)}
           onKeyDown={e => e.key === 'Enter' && onSearch({ ...f, page: 1 })} />
       </div>
 
-      {/* Categories */}
-      <div>
-        <label style={labelStyle}>קטגוריה</label>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-          {CATEGORIES.map(cat => (
-            <button key={cat.id} onClick={() => set('category', cat.id)}
-              style={{
+      {/* Yad2 categories */}
+      {tab === 'yad2' && (
+        <div>
+          <label style={labelStyle}>קטגוריה</label>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            <button onClick={() => set('category', '')} style={{
+              padding: '5px 10px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              background: !f.category ? 'var(--accent)' : '#222', color: 'var(--text)', border: '1px solid var(--border)',
+            }}>הכל</button>
+            {YAD2_CATEGORIES.map(cat => (
+              <button key={cat.id} onClick={() => set('category', cat.id)} style={{
                 padding: '5px 10px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                background: (f.category ?? '') === cat.id ? 'var(--accent)' : '#222',
+                background: f.category === cat.id ? 'var(--accent)' : '#222',
                 color: 'var(--text)', border: '1px solid var(--border)',
-              }}>
-              {cat.label}
-            </button>
-          ))}
+              }}>{cat.label}</button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Car-specific filters — only for vehicles */}
+      {/* Vehicle filters — only yad2 vehicles */}
       {isVehicles && <>
         <div>
           <label style={labelStyle}>יצרן</label>
@@ -83,15 +112,6 @@ export default function FiltersPanel({ makes, onSearch, loading }: Props) {
       <div>
         <label style={labelStyle}>מחיר מקסימלי (₪)</label>
         <input style={inputStyle} type="number" placeholder="100000" value={f.price_max ?? ''} onChange={e => set('price_max', parseInt(e.target.value))} />
-      </div>
-
-      <div>
-        <label style={labelStyle}>מקור</label>
-        <select style={inputStyle} value={f.source ?? ''} onChange={e => set('source', e.target.value)}>
-          <option value="">כולם</option>
-          <option value="yad2">יד2</option>
-          <option value="marketplace">Marketplace</option>
-        </select>
       </div>
 
       <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14 }}>
