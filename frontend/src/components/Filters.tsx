@@ -44,7 +44,7 @@ function detectSmartCategory(text: string): string | null {
 }
 
 export default function FiltersPanel({ makes, onSearch, loading }: Props) {
-  const [f, setF] = useState<Filters>({ private_only: true });
+  const [f, setF] = useState<Filters>({ private_only: true, source: 'yad2' });
   const [tab, setTab] = useState<'yad2' | 'marketplace'>('yad2');
   const [smartHint, setSmartHint] = useState<string | null>(null);
   const set = (k: keyof Filters, v: unknown) => setF(p => ({ ...p, [k]: v || undefined }));
@@ -61,7 +61,7 @@ export default function FiltersPanel({ makes, onSearch, loading }: Props) {
 
   function switchTab(t: 'yad2' | 'marketplace') {
     setTab(t);
-    const newF = { private_only: true, source: t === 'marketplace' ? 'marketplace' : undefined };
+    const newF = { private_only: true, source: t === 'marketplace' ? 'marketplace' : 'yad2' };
     setF(newF);
     onSearch({ ...newF, page: 1 });
   }

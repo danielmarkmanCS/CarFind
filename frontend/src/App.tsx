@@ -15,7 +15,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [makes, setMakes] = useState<string[]>([]);
-  const [filters, setFilters] = useState<Filters>({ private_only: true });
+  const [filters, setFilters] = useState<Filters>({ private_only: true, source: 'yad2' });
   const [view, setView] = useState<View>('search');
   const { ids: wishlistIds, toggle, has } = useWishlist();
 
@@ -38,7 +38,7 @@ export default function App() {
     }
   }, []);
 
-  useEffect(() => { search({ private_only: true, page: 1 }); }, [search]);
+  useEffect(() => { search({ private_only: true, source: 'yad2', page: 1 }); }, [search]);
 
   // Load wishlist listings
   useEffect(() => {

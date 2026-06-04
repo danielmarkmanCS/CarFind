@@ -3,34 +3,74 @@ import { pool } from '../db.js';
 
 const router = Router();
 
-const HE_EN = {
-  // יצרני רכב
-  'טויוטה': 'toyota', 'יונדאי': 'hyundai', 'מאזדה': 'mazda',
-  'פולקסווגן': 'volkswagen vw', 'סקודה': 'skoda', 'סיאט': 'seat',
-  'קיה': 'kia', 'רנו': 'renault', 'פיג׳ו': 'peugeot', 'פיאט': 'fiat',
-  'מיצובישי': 'mitsubishi', 'סובארו': 'subaru', 'אאודי': 'audi',
-  'מרצדס': 'mercedes', 'ב מ וו': 'bmw', 'ניסאן': 'nissan',
-  'הונדה': 'honda', 'שברולט': 'chevrolet', 'פורד': 'ford',
-  'אינפיניטי': 'infiniti', 'לקסוס': 'lexus', 'אקורה': 'acura',
-  // כללי
-  'רכב': 'car', 'מכונית': 'car', 'אוטו': 'car', 'ג׳יפ': 'jeep',
-  'טלוויזיה': 'tv television', 'מחשב': 'computer laptop', 'טלפון': 'phone',
-  'אייפון': 'iphone', 'סמסונג': 'samsung', 'אייפד': 'ipad',
-  'ספה': 'sofa couch', 'כיסא': 'chair', 'שולחן': 'table desk',
-  'מיטה': 'bed', 'ארון': 'wardrobe closet',
-  'נעל': 'shoes', 'חולצה': 'shirt', 'מכנסיים': 'pants jeans',
-  'אופניים': 'bicycle bike', 'קורקינט': 'scooter',
-  'כלב': 'dog', 'חתול': 'cat',
-  'דירה': 'apartment', 'חדר': 'room', 'שכירות': 'rent',
-};
+// Each group: any term matches all others (bidirectional, HE↔EN)
+const SYNONYM_GROUPS = [
+  ['טלוויזיה', 'tv', 'television', 'screen'],
+  ['טלפון', 'phone', 'mobile', 'smartphone', 'פלאפון', 'cellphone'],
+  ['מחשב', 'computer', 'laptop', 'pc', 'notebook'],
+  ['אייפון', 'iphone'],
+  ['סמסונג', 'samsung'],
+  ['אייפד', 'ipad', 'tablet'],
+  ['ספה', 'sofa', 'couch'],
+  ['כיסא', 'chair'],
+  ['שולחן', 'table', 'desk'],
+  ['מיטה', 'bed'],
+  ['ארון', 'wardrobe', 'closet'],
+  ['נעל', 'shoes', 'sneakers', 'boots'],
+  ['חולצה', 'shirt', 'tshirt', 't-shirt'],
+  ['מכנסיים', 'pants', 'jeans', 'trousers'],
+  ['אופניים', 'bicycle', 'bike'],
+  ['קורקינט', 'scooter'],
+  ['כלב', 'dog'],
+  ['חתול', 'cat'],
+  ['דירה', 'apartment', 'flat'],
+  ['חדר', 'room'],
+  ['שכירות', 'rent', 'rental'],
+  ['רכב', 'מכונית', 'אוטו', 'car', 'auto', 'vehicle'],
+  ['ג׳יפ', 'jeep', 'suv'],
+  ['טויוטה', 'toyota'],
+  ['יונדאי', 'hyundai'],
+  ['מאזדה', 'mazda'],
+  ['פולקסווגן', 'volkswagen', 'vw'],
+  ['סקודה', 'skoda'],
+  ['סיאט', 'seat'],
+  ['קיה', 'kia'],
+  ['רנו', 'renault'],
+  ['פיג׳ו', 'peugeot'],
+  ['פיאט', 'fiat'],
+  ['מיצובישי', 'mitsubishi'],
+  ['סובארו', 'subaru'],
+  ['אאודי', 'audi'],
+  ['מרצדס', 'mercedes', 'benz'],
+  ['ב מ וו', 'bmw'],
+  ['ניסאן', 'nissan'],
+  ['הונדה', 'honda'],
+  ['שברולט', 'chevrolet', 'chevy'],
+  ['פורד', 'ford'],
+  ['אינפיניטי', 'infiniti'],
+  ['לקסוס', 'lexus'],
+  ['אקורה', 'acura'],
+];
 
-function expandQuery(q = '') {
-  if (!q) return q;
-  const lower = q.toLowerCase();
-  for (const [he, en] of Object.entries(HE_EN)) {
-    if (lower.includes(he)) return `${q} ${en}`;
+// Build reverse lookup: lowercase term → full group
+const SYNONYM_MAP = new Map();
+for (const group of SYNONYM_GROUPS) {
+  for (const term of group) {
+    SYNONYM_MAP.set(term.toLowerCase(), group);
   }
-  return q;
+}
+
+// Returns all unique search terms to OR together
+function expandQuery(q = '') {
+  if (!q) return [q];
+  const lower = q.toLowerCase();
+  const terms = new Set([q]);
+  for (const [term, group] of SYNONYM_MAP) {
+    if (lower.includes(term)) {
+      group.forEach(syn => terms.add(syn));
+    }
+  }
+  return [...terms];
 }
 
 router.get('/', async (req, res) => {
@@ -49,16 +89,12 @@ router.get('/', async (req, res) => {
       conditions.push(`seller_type = 'private'`);
     }
     if (make) {
-      const makeEn = expandQuery(make);
-      if (makeEn !== make) {
-        conditions.push(`(LOWER(car_make) LIKE LOWER($${i}) OR LOWER(title) LIKE LOWER($${i}) OR LOWER(car_make) LIKE LOWER($${i+1}) OR LOWER(title) LIKE LOWER($${i+1}))`);
-        params.push(`%${make}%`, `%${makeEn}%`);
-        i += 2;
-      } else {
-        conditions.push(`(LOWER(car_make) LIKE LOWER($${i}) OR LOWER(title) LIKE LOWER($${i}))`);
-        params.push(`%${make}%`);
-        i++;
-      }
+      const makeTerms = expandQuery(make);
+      const orParts = makeTerms.map(term => {
+        params.push(`%${term}%`);
+        return `LOWER(car_make) LIKE LOWER($${i++}) OR LOWER(title) LIKE LOWER($${i - 1})`;
+      });
+      conditions.push(`(${orParts.join(' OR ')})`);
     }
     if (model) {
       conditions.push(`LOWER(car_model) LIKE LOWER($${i++})`);
@@ -89,17 +125,12 @@ router.get('/', async (req, res) => {
       params.push(category);
     }
     if (q) {
-      const expanded = expandQuery(q);
-      if (expanded !== q) {
-        // Hebrew + English
-        conditions.push(`(LOWER(title) LIKE LOWER($${i}) OR LOWER(description) LIKE LOWER($${i}) OR LOWER(title) LIKE LOWER($${i+1}) OR LOWER(description) LIKE LOWER($${i+1}))`);
-        params.push(`%${q}%`, `%${expanded}%`);
-        i += 2;
-      } else {
-        conditions.push(`(LOWER(title) LIKE LOWER($${i}) OR LOWER(description) LIKE LOWER($${i}))`);
-        params.push(`%${q}%`);
-        i++;
-      }
+      const terms = expandQuery(q);
+      const orParts = terms.map(term => {
+        params.push(`%${term}%`);
+        return `LOWER(title) LIKE LOWER($${i}) OR LOWER(description) LIKE LOWER($${i++})`;
+      });
+      conditions.push(`(${orParts.join(' OR ')})`);
     }
 
     const offset = (parseInt(page) - 1) * parseInt(limit);
