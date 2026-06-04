@@ -90,8 +90,6 @@ async function scrapeCategory(context, cat) {
         const kmMatch = allText.match(/([\d,]+)\s*k?m/i);
         const rawPrice = priceText ? parseInt(priceText.replace(/\D/g, '')) : null;
         const price = rawPrice && rawPrice >= 10 && rawPrice < 5000000 ? rawPrice : null;
-        // AI classification based on title
-        const aiCategory = classifyListing(title || '', allText);
         results.push({
           source: 'marketplace', external_id,
           title: title || null,
@@ -102,7 +100,8 @@ async function scrapeCategory(context, cat) {
           phone: null, city: null,
           images: img ? [img] : [],
           url: `https://www.facebook.com/marketplace/item/${external_id}/`,
-          category: aiCategory,
+          category: null, // classified in Node.js below
+          _rawText: allText,
         });
       });
       return results;
@@ -111,6 +110,8 @@ async function scrapeCategory(context, cat) {
     console.log(`[marketplace/${cat.id}] found ${listings.length} listings`);
 
     for (const l of listings) {
+      l.category = classifyListing(l.title || '', l._rawText || '');
+      delete l._rawText;
       await upsertListing(l);
       activeIds.push(l.external_id);
     }
