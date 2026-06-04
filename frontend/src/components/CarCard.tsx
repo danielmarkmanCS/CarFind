@@ -2,12 +2,22 @@ import type { Listing } from '../api/listings';
 
 const SOURCE_LABEL: Record<string, string> = {
   yad2: 'יד2',
-  winwin: 'Winwin',
-  forsale: 'Forsale',
   marketplace: 'Marketplace',
 };
 
-export default function CarCard({ listing }: { listing: Listing }) {
+const CATEGORY_LABEL: Record<string, string> = {
+  vehicles: '🚗', 'real-estate': '🏠', electronics: '📱',
+  furniture: '🛋️', clothing: '👕', sports: '⚽', pets: '🐾',
+  jobs: '💼', general: '📦', products: '📦',
+};
+
+interface Props {
+  listing: Listing;
+  wishlisted: boolean;
+  onWishlist: () => void;
+}
+
+export default function CarCard({ listing, wishlisted, onWishlist }: Props) {
   const img = listing.images?.[0];
   const daysAgo = Math.floor(
     (Date.now() - new Date(listing.first_seen_at).getTime()) / 86400000
@@ -33,8 +43,17 @@ export default function CarCard({ listing }: { listing: Listing }) {
           {img ? (
             <img src={img} alt={listing.title ?? ''} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--muted)', fontSize: 32 }}>🚗</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--muted)', fontSize: 32 }}>{CATEGORY_LABEL[listing.category] || '📦'}</div>
           )}
+          {/* כפתור wishlist */}
+          <button onClick={e => { e.preventDefault(); onWishlist(); }} style={{
+            position: 'absolute', top: 8, left: 8, background: 'rgba(0,0,0,0.6)',
+            border: 'none', borderRadius: '50%', width: 32, height: 32, cursor: 'pointer',
+            fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: wishlisted ? '#ef4444' : '#fff',
+          }}>
+            {wishlisted ? '❤️' : '🤍'}
+          </button>
           {/* תגיות */}
           <div style={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 4 }}>
             <span style={{

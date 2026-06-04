@@ -24,10 +24,40 @@ interface Props {
   loading: boolean;
 }
 
+const SMART_CATEGORIES: { keywords: string[]; category: string }[] = [
+  { keywords: ['רכב','מכונית','אופנוע','טויוטה','יונדאי','מאזדה','פולקסווגן','סקודה','BMW','car','honda','ford'], category: 'vehicles' },
+  { keywords: ['דירה','חדר','שכירות','בית','נדל','apartment','rent','room'], category: 'real-estate' },
+  { keywords: ['טלוויזיה','מחשב','טלפון','אייפון','לפטופ','מסך','TV','phone','laptop','iphone','samsung','tablet'], category: 'electronics' },
+  { keywords: ['ספה','כיסא','שולחן','מיטה','ארון','sofa','chair','table','bed'], category: 'furniture' },
+  { keywords: ['חולצה','מכנסיים','נעל','שמלה','תיק','shirt','shoes','dress','bag'], category: 'clothing' },
+  { keywords: ['אופניים','כדור','ספורט','כושר','bike','sport','ball'], category: 'sports' },
+  { keywords: ['כלב','חתול','דג','ציפור','dog','cat','fish','pet'], category: 'pets' },
+  { keywords: ['עבודה','דרוש','משרה','job','hiring','work'], category: 'jobs' },
+];
+
+function detectSmartCategory(text: string): string | null {
+  const lower = text.toLowerCase();
+  for (const rule of SMART_CATEGORIES) {
+    if (rule.keywords.some(kw => lower.includes(kw.toLowerCase()))) return rule.category;
+  }
+  return null;
+}
+
 export default function FiltersPanel({ makes, onSearch, loading }: Props) {
   const [f, setF] = useState<Filters>({ private_only: true });
   const [tab, setTab] = useState<'yad2' | 'marketplace'>('yad2');
+  const [smartHint, setSmartHint] = useState<string | null>(null);
   const set = (k: keyof Filters, v: unknown) => setF(p => ({ ...p, [k]: v || undefined }));
+
+  const handleQChange = (val: string) => {
+    set('q', val);
+    if (tab === 'yad2' && val.length > 2) {
+      const detected = detectSmartCategory(val);
+      setSmartHint(detected);
+    } else {
+      setSmartHint(null);
+    }
+  };
 
   function switchTab(t: 'yad2' | 'marketplace') {
     setTab(t);
@@ -56,8 +86,14 @@ export default function FiltersPanel({ makes, onSearch, loading }: Props) {
       <div>
         <label style={labelStyle}>חיפוש חופשי</label>
         <input style={inputStyle} placeholder="מה אתה מחפש?"
-          value={f.q ?? ''} onChange={e => set('q', e.target.value)}
+          value={f.q ?? ''} onChange={e => handleQChange(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && onSearch({ ...f, page: 1 })} />
+        {smartHint && tab === 'yad2' && (
+          <div style={{ marginTop: 6, fontSize: 12, color: 'var(--accent)', cursor: 'pointer' }}
+            onClick={() => { set('category', smartHint); setSmartHint(null); }}>
+            💡 עבור אוטומטית לקטגוריה: {smartHint} ←
+          </div>
+        )}
       </div>
 
       {/* Yad2 categories */}

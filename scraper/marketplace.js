@@ -2,13 +2,17 @@ import { chromium } from 'playwright-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import { readFileSync } from 'fs';
 import { upsertListing, markInactive } from './dedup.js';
+import { classifyListing } from './categorize.js';
 
 chromium.use(StealthPlugin());
 
-const MARKETPLACE_CATEGORIES = [
-  { id: 'vehicles',    url: 'https://www.facebook.com/marketplace/category/vehicles' },
-  { id: 'real-estate', url: 'https://www.facebook.com/marketplace/category/property-rentals' },
-  { id: 'products',    url: 'https://www.facebook.com/marketplace/category/electronics' },
+// כל הקטגוריות מ-Facebook — AI יסווג לפי תוכן
+const MARKETPLACE_PAGES = [
+  'https://www.facebook.com/marketplace/category/vehicles',
+  'https://www.facebook.com/marketplace/category/property-rentals',
+  'https://www.facebook.com/marketplace/category/electronics',
+  'https://www.facebook.com/marketplace/category/furniture',
+  'https://www.facebook.com/marketplace/category/clothing',
 ];
 
 function parseCard(link, category) {
@@ -86,6 +90,8 @@ async function scrapeCategory(context, cat) {
         const kmMatch = allText.match(/([\d,]+)\s*k?m/i);
         const rawPrice = priceText ? parseInt(priceText.replace(/\D/g, '')) : null;
         const price = rawPrice && rawPrice >= 10 && rawPrice < 5000000 ? rawPrice : null;
+        // AI classification based on title
+        const aiCategory = classifyListing(title || '', allText);
         results.push({
           source: 'marketplace', external_id,
           title: title || null,
@@ -96,7 +102,7 @@ async function scrapeCategory(context, cat) {
           phone: null, city: null,
           images: img ? [img] : [],
           url: `https://www.facebook.com/marketplace/item/${external_id}/`,
-          category,
+          category: aiCategory,
         });
       });
       return results;
@@ -135,8 +141,8 @@ export async function scrapeMarketplace() {
 
   let total = 0;
   try {
-    for (const cat of MARKETPLACE_CATEGORIES) {
-      total += await scrapeCategory(context, cat);
+    for (const url of MARKETPLACE_PAGES) {
+      total += await scrapeCategory(context, { id: 'marketplace', url });
       await new Promise(r => setTimeout(r, 5000 + Math.random() * 5000));
     }
   } finally {
