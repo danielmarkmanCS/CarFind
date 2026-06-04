@@ -3,6 +3,27 @@ import { pool } from '../db.js';
 
 const router = Router();
 
+const HE_EN = {
+  'רכב': 'car', 'מכונית': 'car', 'אוטו': 'car', 'ג׳יפ': 'jeep',
+  'טלוויזיה': 'tv television', 'מחשב': 'computer laptop', 'טלפון': 'phone',
+  'אייפון': 'iphone', 'סמסונג': 'samsung', 'אייפד': 'ipad',
+  'ספה': 'sofa couch', 'כיסא': 'chair', 'שולחן': 'table desk',
+  'מיטה': 'bed', 'ארון': 'wardrobe closet',
+  'נעל': 'shoes', 'חולצה': 'shirt', 'מכנסיים': 'pants jeans',
+  'אופניים': 'bicycle bike', 'קורקינט': 'scooter',
+  'כלב': 'dog', 'חתול': 'cat',
+  'דירה': 'apartment', 'חדר': 'room', 'שכירות': 'rent',
+};
+
+function expandQuery(q = '') {
+  if (!q) return q;
+  const lower = q.toLowerCase();
+  for (const [he, en] of Object.entries(HE_EN)) {
+    if (lower.includes(he)) return `${q} ${en}`;
+  }
+  return q;
+}
+
 router.get('/', async (req, res) => {
   try {
     const {
@@ -52,9 +73,17 @@ router.get('/', async (req, res) => {
       params.push(category);
     }
     if (q) {
-      conditions.push(`(LOWER(title) LIKE LOWER($${i}) OR LOWER(description) LIKE LOWER($${i}))`);
-      params.push(`%${q}%`);
-      i++;
+      const expanded = expandQuery(q);
+      if (expanded !== q) {
+        // Hebrew + English
+        conditions.push(`(LOWER(title) LIKE LOWER($${i}) OR LOWER(description) LIKE LOWER($${i}) OR LOWER(title) LIKE LOWER($${i+1}) OR LOWER(description) LIKE LOWER($${i+1}))`);
+        params.push(`%${q}%`, `%${expanded}%`);
+        i += 2;
+      } else {
+        conditions.push(`(LOWER(title) LIKE LOWER($${i}) OR LOWER(description) LIKE LOWER($${i}))`);
+        params.push(`%${q}%`);
+        i++;
+      }
     }
 
     const offset = (parseInt(page) - 1) * parseInt(limit);

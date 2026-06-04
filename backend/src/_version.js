@@ -1,2 +1,2 @@
-// 2026-06-04T08:50:00Z — category filter + q fix
-export const VERSION = '2.0.0';
+// 2026-06-04T09:30:00Z — category filter + q fix
+export const VERSION = '2.1.0';

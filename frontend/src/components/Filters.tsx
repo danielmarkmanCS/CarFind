@@ -61,7 +61,9 @@ export default function FiltersPanel({ makes, onSearch, loading }: Props) {
 
   function switchTab(t: 'yad2' | 'marketplace') {
     setTab(t);
-    setF({ private_only: true, source: t === 'marketplace' ? 'marketplace' : undefined });
+    const newF = { private_only: true, source: t === 'marketplace' ? 'marketplace' : undefined };
+    setF(newF);
+    onSearch({ ...newF, page: 1 });
   }
 
   const isVehicles = tab === 'yad2' && f.category === 'vehicles';
