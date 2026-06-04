@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { VERSION } from './_version.js';
 import express from 'express';
 import cors from 'cors';
 import listingsRouter from './routes/listings.js';
@@ -17,7 +18,7 @@ app.use('/alerts', alertsRouter);
 
 const scrapeStatus = { lastRun: null, lastError: null, yad2Count: 0 };
 
-app.get('/health', (_req, res) => res.json({ ok: true, ...scrapeStatus }));
+app.get('/health', (_req, res) => res.json({ ok: true, version: VERSION, ...scrapeStatus }));
 
 app.get('/debug/yad2', async (_req, res) => {
   const { chromium } = await import('playwright');
